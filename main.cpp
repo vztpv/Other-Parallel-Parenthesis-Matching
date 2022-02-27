@@ -94,7 +94,7 @@ void solve_parallel_part1(Pos* vec, Stack* _stack,
 					pop_back(_stack);
 				}
 				else {
-					//push_front(_stack, - (start + i + 1));
+					push_front(_stack, - (start + i + 1));
 				}
 			}
 			else {
