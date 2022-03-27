@@ -9,12 +9,14 @@
 
 using Pos = int64_t;
 
-const int THR_NUM = 4; //
+constexpr int THR_NUM = 4; //
 
-std::vector<int> solve(const char* str, int64_t n) {
-	std::vector<int> vec(n, 0);
+int* solve(const char* str, int64_t n) {
+	int* vec = new int[n];
+
 	std::vector<Pos> _stack; _stack.reserve(n / 2);
 
+	int a = clock();
 	for (int64_t i = 0; i < n; ++i) {
 		if (str[i] == '(') {
 			_stack.push_back(i);
@@ -28,7 +30,7 @@ std::vector<int> solve(const char* str, int64_t n) {
 			// else { not valid }
 		}
 	}
-
+	std::cout << clock() - a << "ms\n";
 	return vec;
 }
 
@@ -37,6 +39,8 @@ struct Stack {
 	Pos* _arr = nullptr;
 	int64_t rear = -1;
 };
+
+
 
 inline void push_back(Stack* _stack, Pos item) {
 	++_stack->rear;
@@ -66,14 +70,35 @@ inline void push_front(Stack* _stack, Pos item) {
 	}
 	// insert
 	_stack->_arr[0] = item;
+	++_stack->rear;
+}
+
+inline void pop_front(Stack* _stack) {
+	// shift
+	for (int64_t i = 0; i < _stack->rear; ++i) {
+		_stack->_arr[i] = _stack->_arr[i + 1];
+	}
+	//
+	--_stack->rear;
+}
+
+inline Pos front(Stack*& _stack) {
+	return _stack->_arr[0];
 }
 
 inline int64_t size(Stack* _stack) {
 	return _stack->rear + 1;
 }
 
+inline void print(Stack* _stack) {
+	for (int64_t i = 0; i < size(_stack); ++i) {
+		std::cout << _stack->_arr[i] << " ";
+	}
+	std::cout << "\n";
+}
+
 void solve_parallel_part1(Pos* vec, Stack* _stack,
-										const char* str, int64_t start, int64_t n) 
+							const char* str, int64_t start, int64_t n) 
 {
 
 	int a = clock();
@@ -84,17 +109,15 @@ void solve_parallel_part1(Pos* vec, Stack* _stack,
 		}
 		else {
 			if (!empty(_stack)) {
-				//std::cout << "not empty\n";
-				Pos x = back(_stack); //_stack.pop_back();
+				Pos x = back(_stack); 
 				if (x > 0) {
 					(vec)[start + i] = x - 1 ;
 					(vec)[x - 1] = start + i;
 
-					//std::cout << "here\n";
 					pop_back(_stack);
 				}
 				else {
-					push_front(_stack, - (start + i + 1));
+					push_front(_stack, -(start + i + 1));
 				}
 			}
 			else {
@@ -108,38 +131,39 @@ void solve_parallel_part1(Pos* vec, Stack* _stack,
 }
 
 void solve_parallel_part2(Pos* vec, Stack* _stack[THR_NUM]) {
+
 	for (int i = 1; i < THR_NUM; ++i) {
-		int idx = -1;
-		for (int64_t j = 0; j < size((_stack)[i]); ++j) {
-			if ((_stack)[i]->_arr[j] > 0) {
+		int64_t idx = -1;
+		for (int64_t j = 0; j < size(_stack[i]); ++j) {
+			if (_stack[i]->_arr[j] > 0) {
 				break;
 			}
 			idx++;
 		}
 		if (idx > -1) {
 			for (int64_t j = idx; j >= 0; --j) {
-				Pos before = back(_stack[0]); pop_back((_stack)[0]);
-				Pos now = (_stack)[i]->_arr[j];
+				Pos before = back(_stack[0]); pop_back(_stack[0]);
+				Pos now = _stack[i]->_arr[j];
 
 				vec[before - 1] = -now - 1;
 				vec[-now - 1] = before - 1;
 
-				std::cout << -now - 1 << " " << before - 1 << "\n";
+			//	std::cout << " " << j <<  " " <<  - now - 1 << " " << before - 1 << "\n";
 			}
-			for (int64_t j = idx + 1; j < size((_stack)[i]); ++j) {
-				push_back(_stack[0], (_stack)[i]->_arr[j]);
+			for (int64_t j = idx + 1; j < size(_stack[i]); ++j) {
+				push_back(_stack[0], _stack[i]->_arr[j]);
 			}
 		}
 		else {
-			for (int64_t j = 0; j < size((_stack)[i]); ++j) {
-				push_back(_stack[0], (_stack)[i]->_arr[j]);
+			for (int64_t j = 0; j < size(_stack[i]); ++j) {
+				push_back(_stack[0], _stack[i]->_arr[j]);
 			}
 		}
 	}
 }
 
 Pos* solve_parallel(const char* str, int64_t n) {
-	std::cout << n << "\n";
+	//std::cout << n << "\n";
 
 	Pos* vec = new Pos[n];
 	Stack* _stack[THR_NUM];
@@ -180,16 +204,20 @@ int main(void)
 	for (int i = 0; i < 25; ++i) {
 		str += str;
 	}
-	
+
+	str = "((" + str + "))";
+
 	std::cout << "init end\n";
 	int a = clock();
-	std::vector<int> sol = solve(str.c_str(), str.size());
+	int* sol = solve(str.c_str(), str.size());
 	int b = clock();
-	std::cout << b - a << "ms\n";
-	for (auto x : sol) {
-		std::cout << x << " "; break;
+	std::cout << "total " << b - a << "ms\n";
+	for (int64_t i = 0; i < str.size(); ++i) {
+		std::cout << sol[i] << " "; break;
 	}
+
 	std::cout << "\n";
+	delete[] sol;
 
 	a = clock();
 	Pos* sol2 = solve_parallel(str.c_str(), str.size());
