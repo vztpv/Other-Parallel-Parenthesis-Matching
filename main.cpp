@@ -1,4 +1,5 @@
 
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -7,12 +8,21 @@
 #include <cstdlib>
 #include <ctime>
 
-using Pos = int64_t;
+
+class _Pos {
+public:
+	int64_t x;
+public:
+	_Pos(int64_t x = 0) : x(x) { }
+	operator int64_t() { return x; }
+};
+
+using Pos = _Pos;
 
 constexpr int THR_NUM = 4; //
 
-int* solve(const char* str, int64_t n) {
-	int* vec = new int[n];
+Pos* solve(const char* str, int64_t n) {
+	Pos* vec = (Pos*)calloc(n, sizeof(Pos));
 
 	std::vector<Pos> _stack; _stack.reserve(n / 2);
 
@@ -23,7 +33,7 @@ int* solve(const char* str, int64_t n) {
 		}
 		else {
 			if (!_stack.empty()) {
-				int pos = _stack.back(); _stack.pop_back();
+				Pos pos = _stack.back(); _stack.pop_back();
 				vec[i] = pos;
 				vec[pos] = i;
 			}
@@ -37,22 +47,28 @@ int* solve(const char* str, int64_t n) {
 
 struct Stack {
 	Pos* _arr = nullptr;
-	int64_t rear = -1;
+	Pos* start = nullptr;
+	Pos* rear = nullptr;
 };
 
-
+inline void init(Stack* _stack, Pos* _arr, int n) {
+	_stack->_arr = _arr;
+	_stack->start = _arr + n;
+	_stack->rear = _arr + n;
+}
 
 inline void push_back(Stack* _stack, Pos item) {
+	*(_stack->rear) = item;
 	++_stack->rear;
-	_stack->_arr[_stack->rear] = item;
 }
 
 inline bool empty(Stack* _stack) {
-	return _stack->rear == -1;
+	return _stack->rear == _stack->start;
 }
 
 inline Pos back(Stack* _stack) {
-	return _stack->_arr[_stack->rear];
+	// empty->err..
+	return *(_stack->rear - 1);
 }
 
 inline void pop_back(Stack* _stack) {
@@ -64,30 +80,17 @@ inline void pop_back(Stack* _stack) {
 }
 
 inline void push_front(Stack* _stack, Pos item) {
-	// shift
-	for (int64_t i = _stack->rear; i >= 0; --i) {
-		_stack->_arr[i + 1] = _stack->_arr[i];
-	}
-	// insert
-	_stack->_arr[0] = item;
-	++_stack->rear;
+	_stack->start--;
+	*_stack->start = item;
 }
 
-inline void pop_front(Stack* _stack) {
-	// shift
-	for (int64_t i = 0; i < _stack->rear; ++i) {
-		_stack->_arr[i] = _stack->_arr[i + 1];
-	}
-	//
-	--_stack->rear;
-}
 
-inline Pos front(Stack*& _stack) {
-	return _stack->_arr[0];
+inline Pos front(Stack* _stack) {
+	return _stack->start[0];
 }
 
 inline int64_t size(Stack* _stack) {
-	return _stack->rear + 1;
+	return _stack->rear - _stack->start;
 }
 
 inline void print(Stack* _stack) {
@@ -98,7 +101,7 @@ inline void print(Stack* _stack) {
 }
 
 void solve_parallel_part1(Pos* vec, Stack* _stack,
-							const char* str, int64_t start, int64_t n) 
+	const char* str, int64_t start, int64_t n)
 {
 
 	int a = clock();
@@ -109,9 +112,9 @@ void solve_parallel_part1(Pos* vec, Stack* _stack,
 		}
 		else {
 			if (!empty(_stack)) {
-				Pos x = back(_stack); 
+				Pos x = back(_stack);
 				if (x > 0) {
-					(vec)[start + i] = x - 1 ;
+					(vec)[start + i] = x - 1;
 					(vec)[x - 1] = start + i;
 
 					pop_back(_stack);
@@ -125,7 +128,7 @@ void solve_parallel_part1(Pos* vec, Stack* _stack,
 			}
 		}
 	}
-	
+
 	int b = clock();
 	std::cout << b - a << "ms\n";
 }
@@ -135,7 +138,7 @@ void solve_parallel_part2(Pos* vec, Stack* _stack[THR_NUM]) {
 	for (int i = 1; i < THR_NUM; ++i) {
 		int64_t idx = -1;
 		for (int64_t j = 0; j < size(_stack[i]); ++j) {
-			if (_stack[i]->_arr[j] > 0) {
+			if (_stack[i]->start[j] > 0) {
 				break;
 			}
 			idx++;
@@ -143,56 +146,63 @@ void solve_parallel_part2(Pos* vec, Stack* _stack[THR_NUM]) {
 		if (idx > -1) {
 			for (int64_t j = idx; j >= 0; --j) {
 				Pos before = back(_stack[0]); pop_back(_stack[0]);
-				Pos now = _stack[i]->_arr[j];
+				Pos now = _stack[i]->start[j];
 
 				vec[before - 1] = -now - 1;
 				vec[-now - 1] = before - 1;
 
-			//	std::cout << " " << j <<  " " <<  - now - 1 << " " << before - 1 << "\n";
+				//	std::cout << " " << j <<  " " <<  - now - 1 << " " << before - 1 << "\n";
 			}
 			for (int64_t j = idx + 1; j < size(_stack[i]); ++j) {
-				push_back(_stack[0], _stack[i]->_arr[j]);
+				push_back(_stack[0], _stack[i]->start[j]);
 			}
 		}
 		else {
 			for (int64_t j = 0; j < size(_stack[i]); ++j) {
-				push_back(_stack[0], _stack[i]->_arr[j]);
+				push_back(_stack[0], _stack[i]->start[j]);
 			}
 		}
 	}
 }
 
-Pos* solve_parallel(const char* str, int64_t n) {
+Pos* solve_parallel(const char* str, uint64_t n) {
 	//std::cout << n << "\n";
-
-	Pos* vec = new Pos[n];
+	int _a = clock();
+	Pos* vec = (Pos*)calloc(n, sizeof(Pos));
 	Stack* _stack[THR_NUM];
 	std::thread thr[THR_NUM];
 
 	for (int i = 0; i < THR_NUM; ++i) {
 		_stack[i] = new Stack();
 		if (i == 0) {
-			_stack[i]->_arr = new Pos[n];
+			init(_stack[i], (Pos*)calloc(2 + 2 * n, sizeof(Pos)), n);
 		}
 		else {
-			_stack[i]->_arr = new Pos[1 + (i == THR_NUM  - 1) ? (n - n / THR_NUM * i) : (n / THR_NUM * (i + 1) - n / THR_NUM * i)];
+			int64_t sz = 1 + (i == THR_NUM - 1) ? (n - n / THR_NUM * i) : (n / THR_NUM * (i + 1) - n / THR_NUM * i);
+			init(_stack[i], (Pos*)calloc(2 * sz, sizeof(Pos)), sz);
 		}
+	}
+	std::cout << "chk.. " << clock() - _a << "ms\n";
 
+	for (int i = 0; i < THR_NUM; ++i) {
 		thr[i] = std::thread(solve_parallel_part1, vec, _stack[i],
-			str + n / THR_NUM * i, n / THR_NUM * i, (i == THR_NUM  - 1) ? (n - n / THR_NUM * i) : (n / THR_NUM * (i + 1) - n / THR_NUM * i));
+			str + n / THR_NUM * i, n / THR_NUM * i, (i == THR_NUM - 1) ? (n - n / THR_NUM * i) : (n / THR_NUM * (i + 1) - n / THR_NUM * i));
 	}
 
 	for (int i = 0; i < THR_NUM; ++i) {
 		thr[i].join();
 	}
 
+	int a = clock();
 	solve_parallel_part2(vec, _stack);
-
+	int b = clock();
+	std::cout << "merge " << b - a << "ms\n";
 	for (int i = 0; i < THR_NUM; ++i) {
-		delete[] _stack[i]->_arr;
+		free(_stack[i]->_arr);
 		delete _stack[i];
 	}
-
+	int _b = clock();
+	std::cout << _b - _a << "ms\n";
 	return vec;
 }
 
@@ -200,8 +210,8 @@ Pos* solve_parallel(const char* str, int64_t n) {
 int main(void)
 {
 	std::string str = "((()))()()"; // must valid.
-		
-	for (int i = 0; i < 25; ++i) {
+
+	for (int i = 0; i < 23; ++i) {
 		str += str;
 	}
 
@@ -209,7 +219,7 @@ int main(void)
 
 	std::cout << "init end\n";
 	int a = clock();
-	int* sol = solve(str.c_str(), str.size());
+	Pos* sol = solve(str.c_str(), str.size());
 	int b = clock();
 	std::cout << "total " << b - a << "ms\n";
 	for (int64_t i = 0; i < str.size(); ++i) {
@@ -217,7 +227,7 @@ int main(void)
 	}
 
 	std::cout << "\n";
-	delete[] sol;
+	free(sol);
 
 	a = clock();
 	Pos* sol2 = solve_parallel(str.c_str(), str.size());
@@ -228,7 +238,7 @@ int main(void)
 		std::cout << sol2[i] << " "; break;
 	}
 
-	delete[] sol2;
+	free(sol2);
 	std::cout << "\n";
 
 	return 0;
